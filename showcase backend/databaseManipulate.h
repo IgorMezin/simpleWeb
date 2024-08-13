@@ -84,6 +84,44 @@ bool get_user_from_db(SQLHDBC hDbc, const std::string& fio, const std::string& s
     return false;
 }
 
+std::vector<User> get_all_users_from_db(SQLHDBC hDbc) {
+    SQLHSTMT hStmt;
+    SQLRETURN ret;
+    std::vector<User> users;
+
+    std::string query = "SELECT fio, specialty, subject_scores, study_type FROM users ORDER BY study_type, subject_scores desc";
+
+    SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &hStmt);
+
+    ret = SQLExecDirectA(hStmt, (SQLCHAR*)query.c_str(), SQL_NTS);
+
+    if (SQL_SUCCEEDED(ret)) {
+        // Извлечение данных о пользователях
+        while (SQLFetch(hStmt) == SQL_SUCCESS) {
+            User user;
+            char fioBuffer[256], specialtyBuffer[256], studyTypeBuffer[256];
+            int subjectScoresValue;
+
+            SQLGetData(hStmt, 1, SQL_C_CHAR, fioBuffer, sizeof(fioBuffer), NULL);
+            SQLGetData(hStmt, 2, SQL_C_CHAR, specialtyBuffer, sizeof(specialtyBuffer), NULL);
+            SQLGetData(hStmt, 3, SQL_C_SLONG, &subjectScoresValue, 0, NULL);
+            SQLGetData(hStmt, 4, SQL_C_CHAR, studyTypeBuffer, sizeof(studyTypeBuffer), NULL);
+
+            user.fio = fioBuffer;
+            user.specialty = specialtyBuffer;
+            user.subjectScores = std::to_string(subjectScoresValue);
+            user.study_type = studyTypeBuffer;
+
+            users.push_back(user);
+        }
+    }
+    else {
+        std::cerr << "Failed to execute query." << std::endl;
+    }
+
+    SQLFreeHandle(SQL_HANDLE_STMT, hStmt);
+    return users;
+}
 
 bool delete_user_from_db() { return false; } // not implemented
 
