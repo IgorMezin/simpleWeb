@@ -5,6 +5,12 @@
 #include <boost/asio.hpp>
 
 
+void clear_cookies(crow::response& res) {
+    std::vector<std::string> cookie_names = { "fio", "specialty", "subject_scores", "study_type" };
+    for (const auto& cookie_name : cookie_names) {
+        res.add_header("Set-Cookie", cookie_name + "=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT");
+    }
+}
 
 int main()
 {
@@ -23,6 +29,15 @@ int main()
     CROW_ROUTE(app, "/register").methods("GET"_method, "POST"_method)
         ([&](const crow::request& req, crow::response& res) {
         
+        // Залезем в куки, посмотрим есть ли пользователь в куках
+        auto session_cookie = req.get_header_value("Cookie");
+        if (session_cookie.find("fio=") != std::string::npos) {
+            //clear_cookies(res);
+            res.code = 302;
+            res.set_header("Location", "/users");
+            res.end();
+            return;
+        }
         if (req.method == "GET"_method) {
             std::string content = read_file("register.html");
             res.set_header("Content-Type", "text/html; charset=UTF-8");
@@ -46,6 +61,14 @@ int main()
             if(add_user_to_db(hDbc, fio_part.body, specialty_part.body, subject_scores_part.body, st_type)){ }
             
             //save_user_data(fio_part.body, specialty_part.body, subject_scores_part.body, study_type_part.body);
+
+            // Store cookies with set_cookie
+            auto& ctx = app.get_context<crow::CookieParser>(req);
+            ctx.set_cookie("fio", fio_part.body).path("/").httponly();
+            ctx.set_cookie("specialty", specialty_part.body).path("/").httponly();
+            ctx.set_cookie("subject_scores", subject_scores_part.body).path("/").httponly();
+            ctx.set_cookie("study_type", std::to_string(study_type)).path("/").httponly();
+
             res.code = 302; // HTTP статус для перенаправления
             res.set_header("Location", "/users");
             res.end();
@@ -55,6 +78,15 @@ int main()
 
     CROW_ROUTE(app, "/users").methods("GET"_method)
         ([&](const crow::request& req, crow::response& res) {
+        // Залезем в куки, посмотрим есть ли пользователь в куках
+            auto session_cookie = req.get_header_value("Cookie");
+        if (session_cookie.find("fio=") == std::string::npos) {
+            res.code = 302;
+            res.set_header("Location", "/register");
+            res.end();
+            return;
+        }
+
         if (req.method == "GET"_method) {
             std::vector<User> users = get_all_users_from_db(hDbc);
             std::string template_content = read_file("users.html");
