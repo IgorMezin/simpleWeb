@@ -157,3 +157,60 @@ bool add_user_to_db(SQLHDBC hDbc, const std::string& fio, const std::string& spe
     SQLFreeHandle(SQL_HANDLE_STMT, hStmt);
 }
 
+std::string find_available_study_type(SQLHDBC hDbc, const std::string& fio, const studyType study_type) {
+
+    auto it = std::find(priorityStudyTypes.begin(), priorityStudyTypes.end(), study_type);
+    // Если элемент найден, начать обход с этого элемента до конца, пока не вернется true
+    if (it != priorityStudyTypes.end()) {
+        for (auto current = it; current != priorityStudyTypes.end(); ++current) {
+            SQLHSTMT hStmt;
+            SQLRETURN ret;
+            SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &hStmt);
+
+            std::string study_type_str = convertStudyTypeToStr(*current);
+            std::string query =
+                "WITH ranked_candidates AS( "
+                "    select DISTINCT * from( "
+                "        select * from users where study_type = '" + study_type_str + "' "
+                "        union all "
+                "        select * from users where fio = '" + fio + "' "
+                "        order by subject_scores "
+                "    ) "
+                "    order by subject_scores desc "
+                "    limit 5 "
+                ") "
+                "select EXISTS(select * from ranked_candidates where fio = '" + fio + "') ";
+
+            ret = SQLExecDirectA(hStmt, (SQLCHAR*)query.c_str(), SQL_NTS);
+
+            if (SQL_SUCCEEDED(ret)) {
+                // Извлечение данных о пользователях
+                if(SQLFetch(hStmt) == SQL_SUCCESS) {
+                    bool isHaveVacation;
+                    SQLCHAR booleanValue;
+
+                    SQLRETURN retGetData = SQLGetData(hStmt, 1, SQL_C_BIT, &booleanValue, sizeof(booleanValue), NULL);
+
+                    if (SQL_SUCCEEDED(retGetData)) {
+                        isHaveVacation = booleanValue != 0;  // Преобразуем 0/1 в true/false
+                        if (isHaveVacation)
+                            return convertStudyTypeToStrRu(*current);
+                    }
+                    else {
+                        std::cerr << "Failed to sql get data." << std::endl;
+                    }
+                }
+            }
+            else {
+                std::cerr << "Failed to execute query." << std::endl;
+            }
+
+            SQLFreeHandle(SQL_HANDLE_STMT, hStmt);
+        }
+    }
+    else {
+        // error std::err << "not find a priorityTypes"
+    }  
+
+    return "undefined";
+}

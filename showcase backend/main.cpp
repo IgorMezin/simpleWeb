@@ -89,6 +89,14 @@ int main()
 
         if (req.method == "GET"_method) {
             std::vector<User> users = get_all_users_from_db(hDbc);
+            auto& ctx = app.get_context<crow::CookieParser>(req);
+            // Read cookies with get_cookie
+            const std::string current_user = ctx.get_cookie("fio");
+
+            const int current_study_type = stoi(ctx.get_cookie("study_type"));
+            const studyType stType = convertIntToStudyType(current_study_type);
+
+            std::string vacationForUser = find_available_study_type(hDbc, current_user, stType);
             std::string template_content = read_file("users.html");
             std::string user_rows;
 
@@ -105,6 +113,16 @@ int main()
             size_t pos = template_content.find("<!-- USER_ROWS_MARKER -->");
             if (pos != std::string::npos) {
                 template_content.replace(pos, std::string("<!-- USER_ROWS_MARKER -->").length(), user_rows);
+            }
+
+            // Вставка Вы проходите на <study_type> обучение
+            if (vacationForUser != "undefined") {
+                std::string msg = "Вы проходите на " + vacationForUser +" обучение!";
+                std::string html_text = "<h2 class=\"w-30 text-success \">" + msg + "</h2>";
+                size_t pos = template_content.find("<!-- SUCCESS_OR_LOSE_MARKER -->");
+                if (pos != std::string::npos) {
+                    template_content.replace(pos, std::string("<!-- SUCCESS_OR_LOSE_MARKER -->").length(), html_text);
+                }
             }
 
             res.set_header("Content-Type", "text/html; charset=UTF-8");
