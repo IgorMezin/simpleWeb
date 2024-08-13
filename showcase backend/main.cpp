@@ -53,6 +53,11 @@ int main()
         });
 
 
+    CROW_ROUTE(app, "/users").methods("GET"_method)
+        ([&](const crow::request& req, crow::response& res) {
+        });
+
+
     app.port(18080).multithreaded().run();
 
     SQLDisconnect(hDbc);
